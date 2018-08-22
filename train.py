@@ -14,8 +14,9 @@ from data import load_train_data, load_test_data
 
 K.set_image_data_format('channels_last')  # TF dimension ordering in this code
 
-img_rows = 96
-img_cols = 96
+img_rows = 512
+img_cols = 512
+batch_size = 8
 
 smooth = 1.
 
@@ -114,7 +115,8 @@ def train_and_predict():
     print('-'*30)
     print('Fitting model...')
     print('-'*30)
-    model.fit(imgs_train, imgs_mask_train, batch_size=32, nb_epoch=20, verbose=1, shuffle=True,
+    print(imgs_train.shape, imgs_mask_train.shape)
+    model.fit(imgs_train, imgs_mask_train, batch_size=batch_size, nb_epoch=20, verbose=1, shuffle=True,
               validation_split=0.2,
               callbacks=[model_checkpoint])
 
@@ -123,31 +125,45 @@ def train_and_predict():
     print('-'*30)
     imgs_test, imgs_id_test = load_test_data()
     imgs_test = preprocess(imgs_test)
+    imgs_id_test = preprocess(imgs_id_test)
 
     imgs_test = imgs_test.astype('float32')
     imgs_test -= mean
     imgs_test /= std
 
-    print('-'*30)
-    print('Loading saved weights...')
-    print('-'*30)
-    model.load_weights('weights.h5')
+    imgs_id_test = imgs_id_test.astype('float32')
+    imgs_id_test /= 255.  # scale masks to [0, 1]
+    
+    # print('-'*30)
+    # print('Loading saved weights...')
+    # print('-'*30)
+    # model.load_weights('weights.h5')
 
     print('-'*30)
-    print('Predicting masks on test data...')
+    print('Evaluating model on test data...')
     print('-'*30)
-    imgs_mask_test = model.predict(imgs_test, verbose=1)
-    np.save('imgs_mask_test.npy', imgs_mask_test)
+    score, dice = model.evaluate(imgs_test,
+                                 imgs_id_test,
+                                 batch_size = batch_size)
 
-    print('-' * 30)
-    print('Saving predicted masks to files...')
-    print('-' * 30)
-    pred_dir = 'preds'
-    if not os.path.exists(pred_dir):
-        os.mkdir(pred_dir)
-    for image, image_id in zip(imgs_mask_test, imgs_id_test):
-        image = (image[:, :, 0] * 255.).astype(np.uint8)
-        imsave(os.path.join(pred_dir, str(image_id) + '_pred.png'), image)
+    print("Loss:", score)
+    print("Dice coefficient:", dice)
+    
+    # print('-'*30)
+    # print('Predicting masks on test data...')
+    # print('-'*30)
+    # imgs_mask_test = model.predict(imgs_test, verbose=1)
+    # np.save('imgs_mask_test.npy', imgs_mask_test)
+
+    # print('-' * 30)
+    # print('Saving predicted masks to files...')
+    # print('-' * 30)
+    # pred_dir = 'preds'
+    # if not os.path.exists(pred_dir):
+    #     os.mkdir(pred_dir)
+    # for image, image_id in zip(imgs_mask_test, imgs_id_test):
+    #     image = (image[:, :, 0] * 255.).astype(np.uint8)
+    #     imsave(os.path.join(pred_dir, str(image_id) + '_pred.png'), image)
 
 if __name__ == '__main__':
     train_and_predict()
