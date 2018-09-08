@@ -177,11 +177,9 @@ def train_and_predict(args):
     pred_dir = 'preds'
     if not os.path.exists(pred_dir):
         os.mkdir(pred_dir)
-    import warnings
-    with warnings.catch_warnings():
-        for image, image_id in zip(binary, imgs_flname_test):
-            image = image[:, :, 0]
-            imsave(os.path.join(pred_dir, str(image_id) + '_pred.png'), image)
+    for image, image_id in zip(binary, imgs_flname_test):
+        image = image[:, :, 0]
+        imsave(os.path.join(pred_dir, str(image_id) + '_pred.png'), image)
 
     print('-'*30)
     print('Evaluating model on test data...')
