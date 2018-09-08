@@ -39,7 +39,7 @@ def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
 
 
-def get_unet():
+def get_unet(loss_type):
     inputs = Input((img_rows, img_cols, 1))
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(inputs)
     conv1 = Conv2D(32, (3, 3), activation='relu', padding='same')(conv1)
@@ -80,8 +80,13 @@ def get_unet():
 
     model = Model(inputs=[inputs], outputs=[conv10])
 
+    if loss_type == "dice":
+        loss = dice_coef_loss
+    else:
+        loss = "binary_crossentropy"
+
     model.compile(optimizer=Adam(lr=1e-5),
-                  loss="binary_crossentropy",
+                  loss=loss,
                   metrics=["accuracy", dice_coef])
 
     return model
@@ -128,7 +133,7 @@ def train_and_predict(args):
     print('-'*30)
     print('Creating and compiling model...')
     print('-'*30)
-    model = get_unet()
+    model = get_unet(args.loss)
 
     print('-'*30)
     print('Fitting model...')
@@ -223,6 +228,12 @@ def parseargs():
                         type=str,
                         required=True)
 
+    parser.add_argument("--loss",
+                        type=str,
+                        choices=["crossentropy",
+                                 "dice"],
+                        default="dice")
+    
     return parser.parse_args()
     
 if __name__ == '__main__':
