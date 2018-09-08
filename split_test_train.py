@@ -1,4 +1,5 @@
 import argparse
+from collections import defaultdict
 import glob
 import os
 
@@ -10,8 +11,9 @@ def identify_masks(mask_dir):
     for flname in glob.glob(os.path.join(mask_dir, "*.tif")):
         img = imread(flname, as_grey=True)
 
-        has_mask = img.flatten().max() > 0
-        yield os.path.basename(flname), img, has_mask
+        basename = os.path.basename(flname)
+
+        yield basename, img
 
 def parseargs():
     parser = argparse.ArgumentParser()
@@ -28,55 +30,64 @@ def parseargs():
                         type=str,
                         required=True)
 
-    parser.add_argument("--include-empty-masks",
+    parser.add_argument("--empty-masks",
                         type=str,
-                        default=None,
-                        choices=["testing-set",
-                                 "all"])
+                        default="exclude-all",
+                        choices=["exclude-all",
+                                 "testing-set",
+                                 "include-all"])
+
+    parser.add_argument("--partitioning",
+                        type=str,
+                        default="random",
+                        choices=["random",
+                                 "by-patient"])
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parseargs()
 
-    images = []
-    masks = []
-    no_mask_images = []
-    no_mask_masks = []
-    flnames = []
-    no_mask_flnames = []
-    for flname, mask_img, has_mask in identify_masks(args.mask_dir):
+    triplets = []
+    for flname, mask_img in identify_masks(args.mask_dir):
         path = os.path.join(args.image_dir,
                             flname)
         img = imread(path)
 
         basename = os.path.splitext(flname)[0]
 
-        if has_mask:
-            images.append(img)
-            masks.append(mask_img)
-            flnames.append(basename)
-        elif args.include_empty_masks:
-            no_mask_images.append(img)
-            no_mask_masks.append(mask_img)
-            no_mask_flnames.append(basename)
+        triplets.append((img, mask_img, basename))
 
-    septlet = train_test_split(images, masks, flnames, test_size = 0.333)
-    train_images, test_images, train_masks, test_masks, train_flnames, test_flnames = septlet
+    if args.partitioning == "random":
+        has_tumor = [(1 if mask_img.flatten().max() > 0 else 0) \
+                     for _, mask_img, _ in triplets]
+        train_triplet, test_triplet = train_test_split(triplets,
+                                                       test_size = 0.333,
+                                                       stratify = has_tumor)
+    """
+    elif args.partitioning == "by-patient":
+        patient_groups = defaultdict(list)
 
-    if args.include_empty_masks == "testing-set":
-        test_images.extend(no_mask_images)
-        test_masks.extend(no_mask_masks)
-        test_flnames.extend(no_mask_flnames)
-    else:
-        septlet = train_test_split(no_mask_images, no_mask_masks, no_mask_flnames, test_size = 0.333)
-        no_mask_train_images, no_mask_test_images, no_mask_train_masks, no_mask_test_masks, no_mask_train_flnames, no_mask_test_flnames = septlet
-        train_images.extend(no_mask_train_images)
-        test_images.extend(no_mask_test_images)
-        train_masks.extend(no_mask_train_masks)
-        test_masks.extend(no_mask_test_masks)
-        train_flnames.extend(no_mask_train_flnames)
-        test_flnames.extend(no_mask_test_flnames)
+        for img, mask_img, flname in triplets:
+            patient_id = basename[:basename.find("_", 4)]
+            patient_groups[patient_id].append(img, mask_img, flname)
+
+        patient_has_tumor = []
+        for patient_id, triplets in patient_has_tumor.items():
+    """
+
+    if args.empty_masks == "testing-set":
+        train_triplet = [t for t in train_triplet \
+                         if t[1].flatten().max() > 0]
+    elif args.empty_masks == "exclude-all":
+        train_triplet = [t for t in train_triplet \
+                         if t[1].flatten().max() > 0]
+        test_triplet = [t for t in test_triplet \
+                        if t[1].flatten().max() > 0]
+
+
+    train_images, train_masks, train_flnames = zip(*train_triplet)
+    test_images, test_masks, test_flnames = zip(*test_triplet)
 
     print(len(train_images), "training images")
     print(len(test_images), "testing images")
