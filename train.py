@@ -98,10 +98,19 @@ def preprocess(imgs):
 
 
 def train_and_predict(args):
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    pred_dir = os.path.join(args.output_dir,
+                            "preds")
+        
+    if not os.path.exists(pred_dir):
+        os.makedirs(pred_dir)
+
     print('-'*30)
     print('Loading and preprocessing train data...')
     print('-'*30)
-    imgs_train, imgs_mask_train = load_train_data()
+    imgs_train, imgs_mask_train = load_train_data(args.input_dir)
 
     imgs_train = preprocess(imgs_train)
     imgs_mask_train = preprocess(imgs_mask_train)
@@ -135,7 +144,7 @@ def train_and_predict(args):
     print('-'*30)
     print('Loading and preprocessing test data...')
     print('-'*30)
-    imgs_test, imgs_mask_test, imgs_flname_test = load_test_data()
+    imgs_test, imgs_mask_test, imgs_flname_test = load_test_data(args.input_dir)
     imgs_test = preprocess(imgs_test)
     imgs_mask_test = preprocess(imgs_mask_test)
 
@@ -158,7 +167,8 @@ def train_and_predict(args):
     binary[imgs_pred_mask_test > 0.5] = 255
     imgs_pred_mask_test = binary
     
-    np.save('imgs_pred_mask_test.npy', imgs_pred_mask_test)
+    np.save(os.path.join(args.output_dir, 'imgs_pred_mask_test.npy'),
+            imgs_pred_mask_test)
 
     scaled = binary / 255.
     n_test_images = imgs_pred_mask_test.shape[0]
@@ -169,14 +179,12 @@ def train_and_predict(args):
                          scaled[i])
         test_dice[i] = d
 
-    np.save('imgs_pred_mask_test_dice.npy', test_dice)
+    np.save(os.path.join(args.output_dir, 'imgs_pred_mask_test_dice.npy'),
+            test_dice)
     
     print('-' * 30)
     print('Saving predicted masks to files...')
     print('-' * 30)
-    pred_dir = 'preds'
-    if not os.path.exists(pred_dir):
-        os.mkdir(pred_dir)
     for image, image_id in zip(binary, imgs_flname_test):
         image = image[:, :, 0]
         imsave(os.path.join(pred_dir, str(image_id) + '_pred.png'), image)
@@ -206,6 +214,14 @@ def parseargs():
     parser.add_argument("--validation-split",
                         type=float,
                         default=0.2)
+
+    parser.add_argument("--input-dir",
+                        type=str,
+                        required=True)
+
+    parser.add_argument("--output-dir",
+                        type=str,
+                        required=True)
 
     return parser.parse_args()
     

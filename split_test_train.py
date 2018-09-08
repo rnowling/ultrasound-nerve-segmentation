@@ -81,6 +81,9 @@ if __name__ == "__main__":
     print(len(train_images), "training images")
     print(len(test_images), "testing images")
 
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
     np.save(os.path.join(args.output_dir, "imgs_train.npy"),
             np.array(train_images))
 
