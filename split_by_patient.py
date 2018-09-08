@@ -1,6 +1,7 @@
 import argparse
 from collections import defaultdict
 import glob
+from itertools import chain
 import os
 
 import numpy as np
@@ -30,42 +31,54 @@ def parseargs():
                         type=str,
                         required=True)
 
-    parser.add_argument("--empty-masks",
+    parser.add_argument("--training-filter",
                         type=str,
-                        default="exclude-all",
-                        choices=["exclude-all",
-                                 "testing-set",
-                                 "include-all"])
+                        default="no-filtering",
+                        choices=["no-filtering",
+                                 "patients-without-tumors",
+                                 "empty-masks"])
 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parseargs()
 
-    triplets = []
+    patient_groups = defaultdict(list)
     for flname, mask_img in identify_masks(args.mask_dir):
         path = os.path.join(args.image_dir,
                             flname)
         img = imread(path)
 
         basename = os.path.splitext(flname)[0]
+        patient_id = basename[:basename.find("_", 4)]
+        patient_groups[patient_id].append((img, mask_img, flname))
 
-        triplets.append((img, mask_img, basename))
+    patient_has_tumor = []
+    patient_groups = list(patient_groups.values())
+    for triplets in patient_groups:
+        has_tumor = any([mask_img.flatten().max() > 0 \
+                         for _, mask_img, _ in triplets])
+        patient_has_tumor.append(has_tumor)
 
-    has_tumor = [(1 if mask_img.flatten().max() > 0 else 0) \
-                 for _, mask_img, _ in triplets]
-    train_triplet, test_triplet = train_test_split(triplets,
-                                                   test_size = 0.333,
-                                                   stratify = has_tumor)
-    if args.empty_masks == "testing-set":
+    quadlet = train_test_split(patient_groups,
+                               patient_has_tumor,
+                               test_size = 0.333,
+                               stratify = patient_has_tumor)
+    train_groups, test_groups, train_tumors, test_tumors =  quadlet
+
+    if args.training_filter == "patients-without-tumors":
+        print("Filtering patients without tumors out of training set")
+        print(len(train_groups))
+        train_groups = [t for (t, has_tumor) in zip(train_groups, train_tumors) \
+                        if has_tumor]
+        print(len(train_groups))
+
+    train_triplet = chain(*train_groups)
+    test_triplet = chain(*test_groups)
+
+    if args.training_filter == "empty-masks":
         train_triplet = [t for t in train_triplet \
                          if t[1].flatten().max() > 0]
-    elif args.empty_masks == "exclude-all":
-        train_triplet = [t for t in train_triplet \
-                         if t[1].flatten().max() > 0]
-        test_triplet = [t for t in test_triplet \
-                        if t[1].flatten().max() > 0]
-
 
     train_images, train_masks, train_flnames = zip(*train_triplet)
     test_images, test_masks, test_flnames = zip(*test_triplet)
