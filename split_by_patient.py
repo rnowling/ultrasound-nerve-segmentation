@@ -53,6 +53,8 @@ if __name__ == "__main__":
         patient_id = basename[:basename.find("_", 4)]
         patient_groups[patient_id].append((img, mask_img, flname))
 
+    print("Found", len(patient_groups), "patients")
+
     patient_has_tumor = []
     patient_groups = list(patient_groups.values())
     for triplets in patient_groups:
@@ -79,6 +81,9 @@ if __name__ == "__main__":
     if args.training_filter == "empty-masks":
         train_triplet = [t for t in train_triplet \
                          if t[1].flatten().max() > 0]
+        test_triplet = [t for t in test_triplet \
+                        if t[1].flatten().max() > 0]
+
 
     train_images, train_masks, train_flnames = zip(*train_triplet)
     test_images, test_masks, test_flnames = zip(*test_triplet)
