@@ -10,12 +10,12 @@ from skimage.io import imread
 from sklearn.model_selection import train_test_split
 
 def find_pairs(image_dir, mask_dir):
-    for mask_flname in glob.glob(os.path.join(mask_dir, "*.tif")):
-        mask_basename = os.path.basename(mask_flname)
+    for mask_path in glob.glob(os.path.join(mask_dir, "*.tif")):
+        mask_basename = os.path.basename(mask_path)
 
         img_path = os.path.join(image_dir, mask_basename)
         
-        yield mask_flname, img_path, mask_basename
+        yield mask_path, img_path, mask_basename
 
 def parseargs():
     parser = argparse.ArgumentParser()
@@ -86,13 +86,13 @@ if __name__ == "__main__":
     for img_flname, mask_flname, flname in train_triplets:
         shutil.copy(img_flname,
                     os.path.join(train_images_dir, flname))
-        shutil.copy(img_flname,
+        shutil.copy(mask_flname,
                     os.path.join(train_masks_dir, flname))
 
     for img_flname, mask_flname, flname in test_triplets:
         shutil.copy(img_flname,
                     os.path.join(test_images_dir, flname))
-        shutil.copy(img_flname,
+        shutil.copy(mask_flname,
                     os.path.join(test_masks_dir, flname))
 
 
