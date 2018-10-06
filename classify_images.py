@@ -21,7 +21,7 @@ img_cols = 512
 
 smooth = 1.
 
-def get_unet():
+def get_unet(dropout_rate):
     inputs = Input((img_rows, img_cols, 1))
     conv1 = Conv2D(32, (3, 3), padding='same')(inputs)
     conv1 = ReLU()(conv1)
@@ -55,9 +55,10 @@ def get_unet():
 
     pooling = GlobalMaxPooling2D()(conv5)
 
-    dropout = Dropout(0.75)(pooling)
+    if dropout_rate > 0.0:
+        pooling = Dropout(dropout_rate)(pooling)
 
-    dense1 = Dense(1, activation='sigmoid')(dropout)
+    dense1 = Dense(1, activation='sigmoid')(pooling)
 
     model = Model(inputs=[inputs], outputs=[dense1])
 
@@ -113,7 +114,7 @@ def train_and_predict(args):
     print('-'*30)
     print('Creating and compiling model...')
     print('-'*30)
-    model = get_unet()
+    model = get_unet(args.dropout_rate)
 
     print('-'*30)
     print('Fitting model...')
@@ -178,6 +179,10 @@ def parseargs():
                         type=int,
                         default=8)
 
+    parser.add_argument("--dropout-rate",
+                        type=float,
+                        default=0.75)
+    
     parser.add_argument("--validation-split",
                         type=float,
                         default=0.2)
