@@ -16,7 +16,7 @@ def read_image_pairs(image_dir, mask_dir):
         mask = skio.imread(path)
 
         basename = os.path.splitext(basename)[0]
-        
+
         yield img, mask, basename
 
 def image_rotator(triplets):
@@ -36,7 +36,7 @@ def image_zoomer(triplets):
         yield image, mask, basename
         
         image = ndimage.zoom(image, zoom_amount)[256:768, 256:768]
-        mask = ndimage.zoom(image, zoom_amount)[256:768, 256:768]
+        mask = ndimage.zoom(mask, zoom_amount)[256:768, 256:768]
         suffix = "_zoomed2"
         yield image, mask, basename + suffix
 
@@ -118,8 +118,6 @@ if __name__ == "__main__":
     for image, mask, basename in transformations:
         flname = basename + ".tif"
 
-        print(flname)
-        
         image_path = os.path.join(args.output_img_dir,
                                   flname)
         skio.imsave(image_path, image)
@@ -127,6 +125,8 @@ if __name__ == "__main__":
         mask_path = os.path.join(args.output_mask_dir,
                                  flname)
         skio.imsave(mask_path, mask)
+
+        print(image_path, mask_path)
 
             
 
