@@ -8,12 +8,12 @@ import skimage.io as skio
 
 def read_image_pairs(image_dir, mask_dir):
     for flname in glob.glob(os.path.join(mask_dir, "*.tif")):
-        img = skio.imread(flname, as_grey=True)
+        mask = skio.imread(flname, as_grey=True)
 
         basename = os.path.basename(flname)
 
         path = os.path.join(image_dir, basename)
-        mask = skio.imread(path)
+        img = skio.imread(path)
 
         basename = os.path.splitext(basename)[0]
 
@@ -47,8 +47,8 @@ def image_shifter(triplets):
         # unzoomed image
         yield image, mask, basename
 
-        for x_i in xrange(shift_multiples):
-            for y_i in xrange(shift_multiples):
+        for x_i in range(shift_multiples):
+            for y_i in range(shift_multiples):
                 if x_i == 0 and y_i == 0:
                     continue
                 
