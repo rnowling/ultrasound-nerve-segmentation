@@ -7,6 +7,12 @@ def load_train_data(dirname):
     imgs_mask_train = np.load(os.path.join(dirname, 'imgs_mask_train.npy'))
     return imgs_train, imgs_mask_train
 
+def load_train_data_with_flnames(dirname):
+    imgs_train = np.load(os.path.join(dirname, 'imgs_train.npy'))
+    imgs_mask_train = np.load(os.path.join(dirname, 'imgs_mask_train.npy'))
+    imgs_flname_train = np.load(os.path.join(dirname, 'imgs_flname_train.npy'))
+    return imgs_train, imgs_mask_train, imgs_flname_train
+
 def load_test_data(dirname):
     imgs_test = np.load(os.path.join(dirname, 'imgs_test.npy'))
     imgs_mask_test = np.load(os.path.join(dirname, 'imgs_mask_test.npy'))
