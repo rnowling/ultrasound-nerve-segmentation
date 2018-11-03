@@ -37,6 +37,29 @@ def train_and_predict(args):
     pred_labels = np.load(os.path.join(args.input_dir,
                                        'pred_image_classes.npy'))
 
+    flnames = np.load(os.path.join(args.input_dir,
+                                   "imgs_flname_test.npy"))
+
+    
+    if args.blacklist:
+        with open(args.blacklist) as fl:
+            blacklist = set()
+            for ln in fl:
+                blacklist.add(ln.strip())
+        filtered_test_labels = []
+        filtered_pred_labels = []
+        filtered_flnames = []
+        for i in range(len(test_labels)):
+            flname = flnames[i]
+            if flname not in blacklist:
+                filtered_test_labels.append(test_labels[i])
+                filtered_pred_labels.append(pred_labels[i])
+                filtered_flnames.append(flname)
+
+        test_labels = np.array(filtered_test_labels)
+        pred_labels = np.array(filtered_pred_labels)
+        flnames = np.array(filtered_flnames)
+
     acc = accuracy_score(test_labels,
                          pred_labels)
 
@@ -44,8 +67,6 @@ def train_and_predict(args):
 
     if args.output_mispredictions:
         with open(args.output_mispredictions, "w") as fl:
-            flnames = np.load(os.path.join(args.input_dir,
-                                           "imgs_flname_test.npy"))
             fl.write("Filename\tTrue Label\tPredicted Label\n")
             for i in range(len(pred_labels)):
                 if pred_labels[i] != test_labels[i]:
@@ -65,6 +86,9 @@ def parseargs():
                         required=True)
 
     parser.add_argument("--output-mispredictions",
+                        type=str)
+
+    parser.add_argument("--blacklist",
                         type=str)
 
     return parser.parse_args()
