@@ -32,12 +32,6 @@ def parseargs():
                         type=str,
                         required=True)
 
-    parser.add_argument("--training-filter",
-                        type=str,
-                        default="no-filtering",
-                        choices=["no-filtering",
-                                 "empty-masks"])
-
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -45,11 +39,6 @@ if __name__ == "__main__":
 
     patient_groups = defaultdict(list)
     for mask_flname, img_flname, flname in find_pairs(args.image_dir, args.mask_dir):
-        if args.training_filter == "empty-masks":
-            mask_img = imread(mask_flname, as_grey=True)
-            if mask_img.flatten().max() == 0:
-                continue
-
         patient_id = flname[:flname.find("_", 4)]
         
         patient_groups[patient_id].append((img_flname, mask_flname, flname))
