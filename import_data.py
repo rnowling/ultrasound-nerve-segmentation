@@ -45,6 +45,12 @@ def parseargs():
                         choices=["no-filtering",
                                  "empty-masks"])
 
+    parser.add_argument("--testing-filter",
+                        type=str,
+                        default="no-filtering",
+                        choices=["no-filtering",
+                                 "empty-masks"])
+    
     parser.add_argument("--classification-dir",
                         type=str)
 
@@ -67,8 +73,13 @@ if __name__ == "__main__":
     
     test_triplet = []
     for flname, mask_img in identify_masks(args.test_mask_dir):
+        if args.testing_filter == "empty-masks":
+            if mask_img.flatten().max() == 0:
+                continue
+
         if flname in negative_predictions:
             continue
+        
         path = os.path.join(args.test_image_dir,
                             flname)
         img = imread(path)
