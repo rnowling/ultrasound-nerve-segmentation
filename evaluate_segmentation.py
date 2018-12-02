@@ -42,21 +42,30 @@ def train_and_predict(args):
 
     imgs_mask_test = imgs_mask_test.astype('float32')
     imgs_mask_test /= 255.  # scale masks to [0, 1]
-    test_labels = [mask_img.flatten().max() > 0 \
-                   for mask_img in imgs_mask_test]
+    test_labels = np.array([mask_img.flatten().max() > 0 \
+                            for mask_img in imgs_mask_test])
     
     pred_masks = np.load(os.path.join(args.input_dir,
                                       'imgs_pred_mask_test.npy'))
 
+        
+
     pred_masks = pred_masks.astype('float32')
     scaled = pred_masks / 255.
 
-    pred_labels = [mask_img.flatten().max() > 0 \
-                   for mask_img in pred_masks]
+    pred_labels = np.array([mask_img.flatten().max() > 0 \
+                            for mask_img in pred_masks])
+
+    dice = np.array([np_dice_coef(imgs_mask_test[i], scaled[i]) \
+                     for i in xrange(len(imgs_mask_test))])
     
-    dice = [np_dice_coef(imgs_mask_test[i],
-                         scaled[i]) \
-            for i in xrange(len(imgs_mask_test))]
+    if args.omit_empty:
+        imgs_mask_test = imgs_mask_test[test_labels]
+        pred_masks = pred_masks[test_labels]
+        pred_labels = pred_labels[test_labels]
+        dice = dice[test_labels]
+        test_labels = test_labels[test_labels]
+    
 
     acc = accuracy_score(test_labels,
                          pred_labels)
@@ -70,6 +79,9 @@ def parseargs():
     parser.add_argument("--input-dir",
                         type=str,
                         required=True)
+
+    parser.add_argument("--omit-empty",
+                        action="store_true")
 
     return parser.parse_args()
     
