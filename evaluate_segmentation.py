@@ -42,18 +42,17 @@ def train_and_predict(args):
 
     imgs_mask_test = imgs_mask_test.astype('float32')
     imgs_mask_test /= 255.  # scale masks to [0, 1]
-    imgs_mask_test = np.around(imgs_mask_test)
     test_labels = [mask_img.flatten().max() > 0 \
                    for mask_img in imgs_mask_test]
-
     
     pred_masks = np.load(os.path.join(args.input_dir,
                                       'imgs_pred_mask_test.npy'))
 
     pred_masks = pred_masks.astype('float32')
     scaled = pred_masks / 255.
-    pred_labels = [np.around(scaled.flatten()).max() > 0 \
-                   for mask_img in imgs_mask_test]
+
+    pred_labels = [mask_img.flatten().max() > 0 \
+                   for mask_img in pred_masks]
     
     dice = [np_dice_coef(imgs_mask_test[i],
                          scaled[i]) \
