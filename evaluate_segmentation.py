@@ -6,6 +6,7 @@ import os
 from skimage.transform import resize
 from skimage.io import imsave
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
 import numpy as np
 
 from data import load_train_data, load_test_data
@@ -42,6 +43,7 @@ def train_and_predict(args):
 
     imgs_mask_test = imgs_mask_test.astype('float32')
     imgs_mask_test /= 255.  # scale masks to [0, 1]
+    imgs_mask_test = np.around(imgs_mask_test)
     test_labels = np.array([mask_img.flatten().max() > 0 \
                             for mask_img in imgs_mask_test])
     
@@ -52,26 +54,37 @@ def train_and_predict(args):
 
     pred_masks = pred_masks.astype('float32')
     scaled = pred_masks / 255.
+    scaled = np.around(scaled)
+    print(set(scaled.flatten()), set(imgs_mask_test.flatten()))
 
     pred_labels = np.array([mask_img.flatten().max() > 0 \
                             for mask_img in pred_masks])
 
     dice = np.array([np_dice_coef(imgs_mask_test[i], scaled[i]) \
                      for i in xrange(len(imgs_mask_test))])
-    
+
+    recalls = np.array([recall_score(imgs_mask_test[i].flatten(), scaled[i].flatten()) \
+                        for i in xrange(len(imgs_mask_test))])
+
     if args.omit_empty:
         imgs_mask_test = imgs_mask_test[test_labels]
         pred_masks = pred_masks[test_labels]
         pred_labels = pred_labels[test_labels]
         dice = dice[test_labels]
+        recalls = recalls[test_labels]
         test_labels = test_labels[test_labels]
     
 
     acc = accuracy_score(test_labels,
                          pred_labels)
 
+    recall = recall_score(test_labels,
+                          pred_labels)
+
     print("Dice coefficient:", np.mean(dice), np.std(dice))
+    print("Recall per image:", np.mean(recalls), np.std(recalls))
     print("Accuracy:", acc)
+    print("Recall:", recall)
 
 def parseargs():
     parser = argparse.ArgumentParser()
