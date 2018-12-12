@@ -24,15 +24,14 @@ from data import load_train_data, load_test_data
 img_rows = 512
 img_cols = 512
 
-
-def train_and_predict(args):
+def validate(args):
     print('-'*30)
     print('Loading and preprocessing test data...')
     print('-'*30)
 
     all_true_masks = []
     all_pred_masks = []
-    for input_dir in args.input_dir:
+    for input_dir in args.folds:
         _, true_masks, imgs_flnames = load_test_data(input_dir)
         pred_masks = np.load(os.path.join(input_dir,
                                           'imgs_pred_mask_test.npy'))
@@ -61,17 +60,62 @@ def train_and_predict(args):
 
         print(train_true_masks.shape, train_pred_masks.shape)
 
-        acc =train_and_predict_fold(train_true_masks,
-                                    train_pred_masks,
-                                    test_true_masks,
-                                    test_pred_masks)
+        acc, _ = train_and_predict_fold(train_true_masks,
+                                        train_pred_masks,
+                                        test_true_masks,
+                                        test_pred_masks)
         accuracies.append(acc)
 
     print()
     print("Accuracy mean:", np.mean(accuracies))
     print("Accuracy std:", np.std(accuracies))
 
-def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, test_pred_masks):
+def train_and_predict(args):
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    print('-'*30)
+    print('Loading and preprocessing test data...')
+    print('-'*30)
+
+    _, test_true_masks, test_imgs_flnames = load_test_data(args.input_dir)
+    _, train_true_masks = load_train_data(args.input_dir)
+
+    test_pred_masks = np.load(os.path.join(args.input_dir,
+                                           'imgs_pred_mask_test.npy'))
+    train_pred_masks = np.load(os.path.join(args.input_dir,
+                                            'imgs_pred_mask_train.npy'))
+
+    test_true_masks = test_true_masks.astype('float32')
+    test_true_masks /= 255.  # scale masks to [0, 1]
+    test_true_masks = np.around(test_true_masks)
+
+    test_pred_masks = test_pred_masks.astype('float32')
+    test_pred_masks /= 255.  # scale masks to [0, 1]
+    test_pred_masks = np.around(test_pred_masks)
+
+    train_true_masks = train_true_masks.astype('float32')
+    train_true_masks /= 255.  # scale masks to [0, 1]
+    train_true_masks = np.around(train_true_masks)
+
+    train_pred_masks = train_pred_masks.astype('float32')
+    train_pred_masks /= 255.  # scale masks to [0, 1]
+    train_pred_masks = np.around(train_pred_masks)
+
+    print(train_true_masks.shape,
+          train_pred_masks.shape,
+          test_true_masks.shape,
+          test_pred_masks.shape)
+
+    acc, labels = train_and_predict_fold(train_true_masks,
+                                         train_pred_masks,
+                                         test_true_masks,
+                                         test_pred_masks)
+
+    np.save(os.path.join(args.output_dir, 'pred_image_classes.npy'),
+            labels)
+    
+def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, test_pred_masks, output_plots=False):
     train_labels = np.array([1.0 if mask_img.flatten().max() > 0 else 0.0 \
                              for mask_img in train_true_masks])
 
@@ -105,25 +149,26 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
     projected_train = umap_.transform(train_pred_masks)
     projected_test = umap_.transform(test_pred_masks)
 
-    plt.clf()
-    plt.scatter(projected[negatives_train, 0],
-                projected[negatives_train, 1],
-                label="N")
-    plt.scatter(projected[positives_train, 0],
-                projected[positives_train, 1],
-                label="P")
-    plt.legend()
-    plt.savefig("projected_umap_masks.png", DPI=300)
+    if output_plots:
+        plt.clf()
+        plt.scatter(projected[negatives_train, 0],
+                    projected[negatives_train, 1],
+                    label="N")
+        plt.scatter(projected[positives_train, 0],
+                    projected[positives_train, 1],
+                    label="P")
+        plt.legend()
+        plt.savefig("projected_umap_masks.png", DPI=300)
     
-    plt.clf()
-    plt.scatter(projected_train[negatives_train, 0],
-                projected_train[negatives_train, 1],
-                label="N")
-    plt.scatter(projected_train[positives_train, 0],
-                projected_train[positives_train, 1],
-                label="P")
-    plt.legend()
-    plt.savefig("projected_umap_pred_masks.png", DPI=300)
+        plt.clf()
+        plt.scatter(projected_train[negatives_train, 0],
+                    projected_train[negatives_train, 1],
+                    label="N")
+        plt.scatter(projected_train[positives_train, 0],
+                    projected_train[positives_train, 1],
+                    label="P")
+        plt.legend()
+        plt.savefig("projected_umap_pred_masks.png", DPI=300)
 
     train_features = np.hstack([projected_train,
                                 train_pred_areas])
@@ -152,18 +197,39 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
 
     print("Accuracy:", accuracy)
 
-    return accuracy
+    return accuracy, binary
 
 def parseargs():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--input-dir",
-                        type=str,
-                        nargs="+",
-                        required=True)
+    subparsers = parser.add_subparsers(dest="mode")
 
+    classify_parser = subparsers.add_parser("classify",
+                                            help="Classify slices")
+    
+    classify_parser.add_argument("--input-dir",
+                                 type=str,
+                                 required=True)
+
+    classify_parser.add_argument("--output-dir",
+                                 type=str,
+                                 required=True)
+
+    validation_parser = subparsers.add_parser("validate",
+                                              help="K-Fold validation")
+    
+    validation_parser.add_argument("--folds",
+                                   type=str,
+                                   nargs="+",
+                                   required=True)
     return parser.parse_args()
     
 if __name__ == '__main__':
     args = parseargs()
-    train_and_predict(args)
+
+    if args.mode == "validate":
+        validate(args)
+    elif args.mode == "classify":
+        train_and_predict(args)
+    else:
+         raise Exception("Unknown mode '%s'" % args.mode)   
