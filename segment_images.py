@@ -167,14 +167,25 @@ def train_and_predict(args):
                                         verbose=1,
                                         batch_size = args.batch_size)
 
+    imgs_pred_mask_train = model.predict(imgs_train,
+                                         verbose=1,
+                                         batch_size = args.batch_size)
+    
     # Predictions need to be thresholded
     binary = np.zeros(imgs_pred_mask_test.shape, dtype=np.uint8)
     binary[imgs_pred_mask_test > 0.5] = 255
     imgs_pred_mask_test = binary
+
+    binary_train = np.zeros(imgs_pred_mask_train.shape, dtype=np.uint8)
+    binary_train[imgs_pred_mask_train > 0.5] = 255
+    imgs_pred_mask_train = binary_train
     
     np.save(os.path.join(args.output_dir, 'imgs_pred_mask_test.npy'),
             imgs_pred_mask_test)
 
+    np.save(os.path.join(args.output_dir, 'imgs_pred_mask_train.npy'),
+            imgs_pred_mask_train)
+    
     scaled = binary / 255.
     n_test_images = imgs_pred_mask_test.shape[0]
     test_dice = np.zeros(n_test_images)
