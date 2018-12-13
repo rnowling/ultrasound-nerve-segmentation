@@ -6,6 +6,8 @@ import os
 import numpy as np
 
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
@@ -43,14 +45,16 @@ def validate(args):
         pred_masks = pred_masks.astype('float32')
         pred_masks /= 255.  # scale masks to [0, 1]
         pred_masks = np.around(pred_masks)
-        
+
         all_true_masks.append(true_masks)
         all_pred_masks.append(pred_masks)
 
     all_true_masks = np.array(all_true_masks)
     all_pred_masks = np.array(all_pred_masks)
 
-    accuracies = []
+    accuracies = np.zeros((len(all_true_masks), 21))
+    recalls = np.zeros((len(all_true_masks), 21))
+    precisions = np.zeros((len(all_true_masks), 21))
     for i in xrange(len(all_true_masks)):
         test_pred_masks = all_pred_masks[i]
         test_true_masks = all_true_masks[i]
@@ -60,15 +64,33 @@ def validate(args):
 
         print(train_true_masks.shape, train_pred_masks.shape)
 
-        acc, _ = train_and_predict_fold(train_true_masks,
-                                        train_pred_masks,
-                                        test_true_masks,
-                                        test_pred_masks)
-        accuracies.append(acc)
+        probabilities, test_labels = train_and_predict_fold(train_true_masks,
+                                                            train_pred_masks,
+                                                            test_true_masks,
+                                                            test_pred_masks)
+
+        for j in xrange(21):
+            threshold = 0.05 * j
+
+            binary = np.zeros(probabilities.shape)
+            binary[probabilities >= threshold] = 1.0
+
+            accuracies[i, j] = accuracy_score(test_labels,
+                                              binary)
+
+            recalls[i, j] = recall_score(test_labels,
+                                         binary)
+
+            precisions[i, j] = precision_score(test_labels,
+                                               binary)
 
     print()
-    print("Accuracy mean:", np.mean(accuracies))
-    print("Accuracy std:", np.std(accuracies))
+    print("Accuracy mean:", np.mean(accuracies, axis=0))
+    print("Accuracy std:", np.std(accuracies, axis=0))
+    print("Recall mean:", np.mean(recalls, axis=0))
+    print("Recall std:", np.std(recalls, axis=0))
+    print("Precision mean:", np.mean(precisions, axis=0))
+    print("Precision std:", np.std(precisions, axis=0))
 
 def train_and_predict(args):
     if not os.path.exists(args.output_dir):
@@ -107,14 +129,30 @@ def train_and_predict(args):
           test_true_masks.shape,
           test_pred_masks.shape)
 
-    acc, labels = train_and_predict_fold(train_true_masks,
-                                         train_pred_masks,
-                                         test_true_masks,
-                                         test_pred_masks)
+    probs, test_labels = train_and_predict_fold(train_true_masks,
+                                                train_pred_masks,
+                                                test_true_masks,
+                                                test_pred_masks)
+
+    pred_labels = np.zeros(probs.shape)
+    pred_labels[probs >= args.threshold] = 1.0
+
+    accuracy = accuracy_score(test_labels,
+                              pred_labels)
+
+    recall = recall_score(test_labels,
+                          pred_labels)
+
+    precision = precision_score(test_labels,
+                                pred_labels)
+
+    print("Accuracy", accuracy)
+    print("Recall", recall)
+    print("Precision", precision)
 
     np.save(os.path.join(args.output_dir, 'pred_image_classes.npy'),
-            labels)
-    
+            pred_labels)
+
 def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, test_pred_masks, output_plots=False):
     train_labels = np.array([1.0 if mask_img.flatten().max() > 0 else 0.0 \
                              for mask_img in train_true_masks])
@@ -133,10 +171,10 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
 
     test_pred_areas = np.array([np.sum(mask_img)
                                  for mask_img in test_pred_masks]).reshape(-1, 1)
-    
+
     train_pred_masks = train_pred_masks.reshape(-1, img_rows * img_cols)
     test_pred_masks = test_pred_masks.reshape(-1, img_rows * img_cols)
-    
+
     print('-'*30)
     print('Fitting model...')
     print('-'*30)
@@ -159,7 +197,7 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
                     label="P")
         plt.legend()
         plt.savefig("projected_umap_masks.png", DPI=300)
-    
+
         plt.clf()
         plt.scatter(projected_train[negatives_train, 0],
                     projected_train[negatives_train, 1],
@@ -179,8 +217,8 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
     scaler = StandardScaler()
     train_features = scaler.fit_transform(train_features)
     test_features = scaler.transform(test_features)
-    
-    #model = RandomForestClassifier(n_estimators = 250)
+
+    #model = RandomForestClassifier(n_estimators = 100)
     model = SGDClassifier(loss="log", penalty="l2", max_iter=5000)
     model.fit(train_features, train_labels)
 
@@ -190,14 +228,9 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
     print('-'*30)
     print('Predicting masks on test data...')
     print('-'*30)
-    binary = model.predict(test_features)
+    probabilities = model.predict_proba(test_features)[:, 1]
 
-    accuracy = accuracy_score(test_labels,
-                              binary)
-
-    print("Accuracy:", accuracy)
-
-    return accuracy, binary
+    return probabilities, test_labels
 
 def parseargs():
     parser = argparse.ArgumentParser()
@@ -206,7 +239,7 @@ def parseargs():
 
     classify_parser = subparsers.add_parser("classify",
                                             help="Classify slices")
-    
+
     classify_parser.add_argument("--input-dir",
                                  type=str,
                                  required=True)
@@ -215,15 +248,20 @@ def parseargs():
                                  type=str,
                                  required=True)
 
+    classify_parser.add_argument("--threshold",
+                                 type=float,
+                                 default=0.15)
+
     validation_parser = subparsers.add_parser("validate",
                                               help="K-Fold validation")
-    
+
     validation_parser.add_argument("--folds",
                                    type=str,
                                    nargs="+",
                                    required=True)
+
     return parser.parse_args()
-    
+
 if __name__ == '__main__':
     args = parseargs()
 
@@ -232,4 +270,4 @@ if __name__ == '__main__':
     elif args.mode == "classify":
         train_and_predict(args)
     else:
-         raise Exception("Unknown mode '%s'" % args.mode)   
+        raise Exception("Unknown mode '%s'" % args.mode)   
