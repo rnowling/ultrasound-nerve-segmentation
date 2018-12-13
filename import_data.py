@@ -61,29 +61,38 @@ if __name__ == "__main__":
 
     negative_predictions = set()
     if args.classification_dir:
-            pred_labels = np.load(os.path.join(args.classification_dir,
-                                               'pred_image_classes.npy'))
+        pred_labels = np.load(os.path.join(args.classification_dir,
+                                           'pred_image_classes.npy'))
 
-            flnames = np.load(os.path.join(args.classification_dir,
-                                           "imgs_flname_test.npy"))
+        flnames = np.load(os.path.join(args.classification_dir,
+                                       "imgs_flname_test.npy"))
 
-            for flname, label in zip(flnames, pred_labels):
-                if label == 0:
-                    negative_predictions.add(flname)
+        print(pred_labels.shape, flnames.shape)
+
+        for flname, label in zip(flnames, pred_labels):
+            if label == 0:
+                negative_predictions.add(flname)
+
+    print(len(negative_predictions), "negative predictions")
     
     test_triplet = []
+    excluded = 0
     for flname, mask_img in identify_masks(args.test_mask_dir):
         if args.testing_filter == "empty-masks":
             if mask_img.flatten().max() == 0:
                 continue
 
         if flname in negative_predictions:
+            excluded += 1 
             continue
         
         path = os.path.join(args.test_image_dir,
                             flname)
         img = imread(path)
         test_triplet.append((img, mask_img, flname))
+
+    print(excluded, "excluded from test")
+    print(len(test_triplet), "kept")
 
     train_triplet = []
     for flname, mask_img in identify_masks(args.train_mask_dir):

@@ -42,12 +42,13 @@ def train_and_predict(args):
     imgs_mask_test = np.around(imgs_mask_test)
     test_labels = np.array([mask_img.flatten().max() > 0 \
                             for mask_img in imgs_mask_test])
+    print(len(test_labels), "masks in test set")
     
     pred_masks = np.load(os.path.join(args.input_dir,
                                       'imgs_pred_mask_test.npy'))
 
-        
-
+    print(len(pred_masks), "pred masks in test set")
+    
     pred_masks = pred_masks.astype('float32')
     scaled = pred_masks / 255.
     scaled = np.around(scaled)
@@ -73,6 +74,8 @@ def train_and_predict(args):
         recalls = recalls[test_labels]
         pred_components = pred_components[test_labels]
         test_labels = test_labels[test_labels]
+
+    print("Dice", np.sort(dice))
 
     acc = accuracy_score(test_labels,
                          pred_labels)
