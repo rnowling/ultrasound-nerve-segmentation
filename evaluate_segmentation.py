@@ -66,16 +66,19 @@ def train_and_predict(args):
     pred_components = np.array([labelcc(mask_img, return_num=True)[1]
                                 for mask_img in pred_masks])
 
+    # recall only applies to masks with
+    # prostates in them
+    recalls = recalls[test_labels]
+
     if args.omit_empty:
         imgs_mask_test = imgs_mask_test[test_labels]
         pred_masks = pred_masks[test_labels]
         pred_labels = pred_labels[test_labels]
         dice = dice[test_labels]
-        recalls = recalls[test_labels]
         pred_components = pred_components[test_labels]
         test_labels = test_labels[test_labels]
 
-    print("Dice", np.sort(dice))
+    # print("Dice", np.sort(dice))
 
     acc = accuracy_score(test_labels,
                          pred_labels)
