@@ -18,7 +18,7 @@ def parseargs():
 
     parser.add_argument("--min-area",
                         type=float,
-                        default=0.01)
+                        default=0.025)
 
     return parser.parse_args()
 
