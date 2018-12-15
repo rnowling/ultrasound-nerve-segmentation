@@ -229,7 +229,7 @@ def parseargs():
 
     parser.add_argument("--validation-split",
                         type=float,
-                        default=0.2)
+                        default=0.0)
 
     parser.add_argument("--input-dir",
                         type=str,
