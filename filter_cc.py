@@ -5,6 +5,9 @@ import numpy as np
 from skimage.io import imsave
 from skimage.measure import label as labelcc
 
+img_rows = 512
+img_cols = 512
+
 def parseargs():
     parser = argparse.ArgumentParser()
 
@@ -13,6 +16,10 @@ def parseargs():
                         required=True)
     
     parser.add_argument("--output-dir",
+                        type=str,
+                        required=True)
+
+    parser.add_argument("--classification-dir",
                         type=str,
                         required=True)
 
@@ -55,15 +62,23 @@ if __name__ == "__main__":
 
     pred_masks = np.load(os.path.join(args.input_dir,
                                       "imgs_pred_mask_test.npy"))
-    
-    for i, (image_id, mask) in enumerate(zip(test_flnames, pred_masks)):
-        cc_labels, num_ccs = labelcc(mask, return_num=True)
 
-        for j in xrange(1, num_ccs):
-            area = float(mask[cc_labels == j].size) / mask.size
-            print j, area
-            if area < args.min_area:
-                mask[cc_labels == j] = 0
+    pred_labels = np.load(os.path.join(args.classification_dir,
+                                       "pred_image_classes.npy"))
+
+    empty_mask = np.zeros((img_rows, img_cols, 1))
+    for i, (image_id, mask, label) in enumerate(zip(test_flnames, pred_masks, pred_labels)):
+
+        if label == 0:
+            pred_masks[i] = empty_mask
+        else:
+            cc_labels, num_ccs = labelcc(mask, return_num=True)
+
+            for j in xrange(1, num_ccs):
+                area = float(mask[cc_labels == j].size) / mask.size
+                print j, area
+                if area < args.min_area:
+                    mask[cc_labels == j] = 0
 
         pred_masks[i] = mask
 
