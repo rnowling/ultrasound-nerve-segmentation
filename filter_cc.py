@@ -5,6 +5,12 @@ import numpy as np
 from skimage.io import imsave
 from skimage.measure import label as labelcc
 
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+
+import warnings
+
 img_rows = 512
 img_cols = 512
 
@@ -26,6 +32,10 @@ def parseargs():
     parser.add_argument("--min-area",
                         type=float,
                         default=0.025)
+
+    parser.add_argument("--threshold",
+                        type=float,
+                        required=True)
 
     return parser.parse_args()
 
@@ -63,8 +73,20 @@ if __name__ == "__main__":
     pred_masks = np.load(os.path.join(args.input_dir,
                                       "imgs_pred_mask_test.npy"))
 
-    pred_labels = np.load(os.path.join(args.classification_dir,
-                                       "pred_image_classes.npy"))
+    pred_probs = np.load(os.path.join(args.classification_dir,
+                                       "pred_image_probabilities.npy"))
+
+    pred_labels = np.zeros(pred_probs.shape)
+    pred_labels[pred_probs >= args.threshold] = 1.0
+
+    test_labels = np.array([mask_img.flatten().max() > 0 \
+                            for mask_img in test_masks])
+
+    print("Predicted", np.sum(pred_labels))
+    print("True prostates", np.sum(test_labels))
+    print("Accuracy", accuracy_score(test_labels, pred_labels))
+    print("Recall", recall_score(test_labels, pred_labels))
+    print("Precision", precision_score(test_labels, pred_labels))
 
     empty_mask = np.zeros((img_rows, img_cols, 1))
     for i, (image_id, mask, label) in enumerate(zip(test_flnames, pred_masks, pred_labels)):
@@ -76,15 +98,16 @@ if __name__ == "__main__":
 
             for j in xrange(1, num_ccs):
                 area = float(mask[cc_labels == j].size) / mask.size
-                print j, area
                 if area < args.min_area:
                     mask[cc_labels == j] = 0
 
         pred_masks[i] = mask
 
-        imsave(os.path.join(pred_dir,
-                            str(image_id[:-4]) + '_pred.png'),
-               mask[:, :, 0])
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            imsave(os.path.join(pred_dir,
+                                str(image_id[:-4]) + '_pred.png'),
+                   mask[:, :, 0])
 
     np.save(os.path.join(args.output_dir, "imgs_pred_mask_test.npy"),
             pred_masks)
