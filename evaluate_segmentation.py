@@ -6,6 +6,8 @@ import os
 from skimage.measure import label as labelcc
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+
 import numpy as np
 
 from data import load_train_data, load_test_data
@@ -43,6 +45,7 @@ def train_and_predict(args):
     test_labels = np.array([mask_img.flatten().max() > 0 \
                             for mask_img in imgs_mask_test])
     print(len(test_labels), "masks in test set")
+    print(sum(test_labels), "images with prostates")
     
     pred_masks = np.load(os.path.join(args.input_dir,
                                       'imgs_pred_mask_test.npy'))
@@ -60,23 +63,36 @@ def train_and_predict(args):
     dice = np.array([np_dice_coef(imgs_mask_test[i], scaled[i]) \
                      for i in xrange(len(imgs_mask_test))])
 
+    # recall only applies to masks with
+    # prostates in them
     recalls = np.array([recall_score(imgs_mask_test[i].flatten(), scaled[i].flatten()) \
-                        for i in xrange(len(imgs_mask_test))])
+                        for i in xrange(len(imgs_mask_test)) \
+                        if test_labels[i] == 1.0])
+
 
     pred_components = np.array([labelcc(mask_img, return_num=True)[1]
                                 for mask_img in pred_masks])
 
-    # recall only applies to masks with
-    # prostates in them
-    recalls = recalls[test_labels]
-
     if args.omit_empty:
+        # precision only applies to images predicted to have
+        # prostates in them
+        precisions = np.array([precision_score(imgs_mask_test[i].flatten(), scaled[i].flatten()) \
+                               for i in xrange(len(imgs_mask_test)) \
+                               if pred_labels[i] == 1.0 and test_labels[i] == 1.0])
+
         imgs_mask_test = imgs_mask_test[test_labels]
         pred_masks = pred_masks[test_labels]
         pred_labels = pred_labels[test_labels]
         dice = dice[test_labels]
         pred_components = pred_components[test_labels]
         test_labels = test_labels[test_labels]
+    else:
+        # precision only applies to images predicted to have
+        # prostates in them
+        precisions = np.array([precision_score(imgs_mask_test[i].flatten(), scaled[i].flatten()) \
+                               for i in xrange(len(imgs_mask_test)) \
+                               if pred_labels[i] == 1.0])
+
 
     # print("Dice", np.sort(dice))
 
@@ -88,8 +104,9 @@ def train_and_predict(args):
 
     print("Dice coefficient:", np.mean(dice), np.std(dice))
     print("Recall per image:", np.mean(recalls), np.std(recalls))
-    print("Accuracy:", acc)
-    print("Recall:", recall)
+    print("Precision per image:", np.mean(precisions), np.std(precisions))
+    #print("Accuracy:", acc)
+    #print("Recall:", recall)
 
     bin_counts = np.bincount(pred_components)
     print("CC distribution:", bin_counts)
