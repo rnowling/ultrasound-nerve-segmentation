@@ -8,6 +8,8 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import precision_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
@@ -52,9 +54,10 @@ def validate(args):
     all_true_masks = np.array(all_true_masks)
     all_pred_masks = np.array(all_pred_masks)
 
-    accuracies = np.zeros((len(all_true_masks), 21))
-    recalls = np.zeros((len(all_true_masks), 21))
-    precisions = np.zeros((len(all_true_masks), 21))
+    accuracies = np.zeros((len(all_true_masks)))
+    recalls = np.zeros((len(all_true_masks)))
+    precisions = np.zeros((len(all_true_masks)))
+    aucs = []
     for i in xrange(len(all_true_masks)):
         test_pred_masks = all_pred_masks[i]
         test_true_masks = all_true_masks[i]
@@ -69,28 +72,37 @@ def validate(args):
                                                             test_true_masks,
                                                             test_pred_masks)
 
-        for j in xrange(21):
-            threshold = 0.05 * j
+        aucs.append(roc_auc_score(test_labels, probabilities))
 
-            binary = np.zeros(probabilities.shape)
-            binary[probabilities >= threshold] = 1.0
+        fpr, tpr, _ = roc_curve(test_labels, probabilities)
+        plt.plot(fpr, tpr)
 
-            accuracies[i, j] = accuracy_score(test_labels,
-                                              binary)
+        binary = np.zeros(probabilities.shape)
+        binary[probabilities >= 0.5] = 1.0
 
-            recalls[i, j] = recall_score(test_labels,
-                                         binary)
+        accuracies[i] = accuracy_score(test_labels,
+                                       binary)
 
-            precisions[i, j] = precision_score(test_labels,
-                                               binary)
+        recalls[i] = recall_score(test_labels,
+                                  binary)
+
+        precisions[i] = precision_score(test_labels,
+                                        binary)
+
+
+    plt.xlabel("False Positive Rate", fontsize=16)
+    plt.ylabel("True Positive Rate", fontsize=16)
+    plt.savefig("roc_curve_crossfold.png", DPI=300)
 
     print()
-    print("Accuracy mean:", np.mean(accuracies, axis=0))
-    print("Accuracy std:", np.std(accuracies, axis=0))
-    print("Recall mean:", np.mean(recalls, axis=0))
-    print("Recall std:", np.std(recalls, axis=0))
-    print("Precision mean:", np.mean(precisions, axis=0))
-    print("Precision std:", np.std(precisions, axis=0))
+    print("Accuracy mean:", np.mean(accuracies))
+    print("Accuracy std:", np.std(accuracies))
+    print("Recall mean:", np.mean(recalls))
+    print("Recall std:", np.std(recalls))
+    print("Precision mean:", np.mean(precisions))
+    print("Precision std:", np.std(precisions))
+    print("AUC mean:", np.mean(aucs))
+    print("AUC std:", np.std(aucs))
 
 def train_and_predict(args):
     if not os.path.exists(args.output_dir):
@@ -134,24 +146,24 @@ def train_and_predict(args):
                                                 test_true_masks,
                                                 test_pred_masks)
 
-    pred_labels = np.zeros(probs.shape)
-    pred_labels[probs >= args.threshold] = 1.0
+    # pred_labels = np.zeros(probs.shape)
+    # pred_labels[probs >= args.threshold] = 1.0
 
-    accuracy = accuracy_score(test_labels,
-                              pred_labels)
+    # accuracy = accuracy_score(test_labels,
+    #                           pred_labels)
 
-    recall = recall_score(test_labels,
-                          pred_labels)
+    # recall = recall_score(test_labels,
+    #                       pred_labels)
 
-    precision = precision_score(test_labels,
-                                pred_labels)
+    # precision = precision_score(test_labels,
+    #                             pred_labels)
 
-    print("Accuracy", accuracy)
-    print("Recall", recall)
-    print("Precision", precision)
+    # print("Accuracy", accuracy)
+    # print("Recall", recall)
+    # print("Precision", precision)
 
-    np.save(os.path.join(args.output_dir, 'pred_image_classes.npy'),
-            pred_labels)
+    np.save(os.path.join(args.output_dir, 'pred_image_probabilities.npy'),
+            probs)
 
 def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, test_pred_masks, output_plots=False):
     train_labels = np.array([1.0 if mask_img.flatten().max() > 0 else 0.0 \
@@ -219,7 +231,7 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
     test_features = scaler.transform(test_features)
 
     #model = RandomForestClassifier(n_estimators = 100)
-    model = SGDClassifier(loss="log", penalty="l2", max_iter=5000)
+    model = SGDClassifier(loss="log", penalty="l2", max_iter=10000)
     model.fit(train_features, train_labels)
 
     print(model.coef_)
@@ -229,6 +241,14 @@ def train_and_predict_fold(train_true_masks, train_pred_masks, test_true_masks, 
     print('Predicting masks on test data...')
     print('-'*30)
     probabilities = model.predict_proba(test_features)[:, 1]
+
+    fpr, tpr, thresholds = roc_curve(test_labels, probabilities)
+    print("AUC", roc_auc_score(test_labels, probabilities))
+    print(thresholds)
+    #plt.plot(fpr, tpr)
+    #plt.xlabel("FPR", fontsize=16)
+    #plt.ylabel("TPR", fontsize=16)
+    #plt.savefig("roc_curve.png", DPI=200)
 
     return probabilities, test_labels
 
