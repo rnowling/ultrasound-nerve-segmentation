@@ -32,6 +32,10 @@ def parseargs():
                         type=str,
                         required=True)
 
+    parser.add_argument("--test-frac",
+                        type=float,
+                        required=True)
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -46,7 +50,7 @@ if __name__ == "__main__":
     print("Found", len(patient_groups), "patients")
 
     pair = train_test_split(list(patient_groups.values()),
-                            test_size = 0.333)
+                            test_size = args.test_frac)
     train_patients, test_patients = pair
     train_triplets = list(chain(*train_patients))
     test_triplets = list(chain(*test_patients))
